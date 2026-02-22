@@ -4,7 +4,11 @@ import { useRef, useEffect } from "react";
 import gsap from "gsap";
 import FolderCard from "./FolderCard";
 
-export default function Hero() {
+interface HeroProps {
+  easterEggTriggered?: boolean;
+}
+
+export default function Hero({ easterEggTriggered = false }: HeroProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
 
   useEffect(() => {
@@ -15,6 +19,26 @@ export default function Hero() {
       { y: 0, opacity: 1, duration: 1, ease: "power3.out", delay: 0.15 }
     );
   }, []);
+
+  useEffect(() => {
+    if (!easterEggTriggered || !titleRef.current) return;
+
+    // Animate title text change
+    gsap.to(titleRef.current, {
+      duration: 0.3,
+      opacity: 0,
+      onComplete: () => {
+        if (titleRef.current) {
+          titleRef.current.textContent = "yes????";
+          gsap.to(titleRef.current, {
+            duration: 0.4,
+            opacity: 1,
+            ease: "back.out(1.7)",
+          });
+        }
+      },
+    });
+  }, [easterEggTriggered]);
 
   return (
     <section className="relative flex min-h-screen w-full flex-col items-center justify-center gap-4 overflow-hidden px-4 py-16">
@@ -31,7 +55,7 @@ export default function Hero() {
       </h1>
 
       {/* Folder card */}
-      <FolderCard />
+      <FolderCard easterEggTriggered={easterEggTriggered} />
     </section>
   );
 }

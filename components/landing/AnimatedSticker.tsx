@@ -8,17 +8,19 @@ interface AnimatedStickerProps {
   src: string;
   alt: string;
   rotate?: number;
+  disabled?: boolean;
 }
 
 export default function AnimatedSticker({
   src,
   alt,
   rotate = 0,
+  disabled = false,
 }: AnimatedStickerProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   const handleMouseEnter = () => {
-    if (!ref.current) return;
+    if (disabled || !ref.current) return;
     gsap.to(ref.current, {
       rotation: rotate + (Math.random() > 0.5 ? 10 : -10),
       scale: 1.15,
@@ -28,7 +30,7 @@ export default function AnimatedSticker({
   };
 
   const handleMouseLeave = () => {
-    if (!ref.current) return;
+    if (disabled || !ref.current) return;
     gsap.to(ref.current, {
       rotation: rotate,
       scale: 1,
@@ -38,7 +40,7 @@ export default function AnimatedSticker({
   };
 
   const handlePointerDown = () => {
-    if (!ref.current) return;
+    if (disabled || !ref.current) return;
     gsap.to(ref.current, {
       scale: 1.25,
       duration: 0.15,
@@ -47,7 +49,7 @@ export default function AnimatedSticker({
   };
 
   const handlePointerUp = () => {
-    if (!ref.current) return;
+    if (disabled || !ref.current) return;
     gsap.to(ref.current, {
       scale: 1.15,
       duration: 0.3,
@@ -58,7 +60,7 @@ export default function AnimatedSticker({
   return (
     <div
       ref={ref}
-      className="cursor-pointer select-none"
+      className={`select-none ${!disabled ? "cursor-pointer" : ""}`}
       style={{ transform: `rotate(${rotate}deg)` }}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}

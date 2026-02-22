@@ -67,8 +67,13 @@ const STICKERS = [
   },
 ];
 
-export default function FolderCard() {
+interface FolderCardProps {
+  easterEggTriggered?: boolean;
+}
+
+export default function FolderCard({ easterEggTriggered = false }: FolderCardProps) {
   const cardRef = useRef<HTMLDivElement>(null);
+  const stickerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   useEffect(() => {
     if (!cardRef.current) return;
@@ -79,9 +84,43 @@ export default function FolderCard() {
     );
   }, []);
 
+  // Handle Easter Egg animations
+  useEffect(() => {
+    if (!easterEggTriggered) return;
+
+    // Straighten folder (remove rotation)
+    if (cardRef.current) {
+      gsap.to(cardRef.current, {
+        rotation: 0,
+        duration: 0.8,
+        ease: "power2.inOut",
+      });
+    }
+
+    // Animate stickers falling with helical motion
+    stickerRefs.current.forEach((stickerEl, id) => {
+      if (!stickerEl) return;
+
+      const delay = Math.random() * 0.3; // Stagger start times
+      const duration = 2 + Math.random() * 0.8;
+      const spreadX = (Math.random() - 0.5) * 300; // Random left/right drift
+      const swingAmount = (Math.random() - 0.5) * 720; // Random rotation amount
+
+      gsap.to(stickerEl, {
+        y: window.innerHeight + 100,
+        x: spreadX,
+        rotation: swingAmount,
+        opacity: 0,
+        duration: duration,
+        delay: delay,
+        ease: "power1.in",
+      });
+    });
+  }, [easterEggTriggered]);
+
   /* ── Whole‑card hover / tap ── */
   const onEnter = () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || easterEggTriggered) return;
     gsap.to(cardRef.current, {
       rotation: 3,
       scale: 1.03,
@@ -90,7 +129,7 @@ export default function FolderCard() {
     });
   };
   const onLeave = () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || easterEggTriggered) return;
     gsap.to(cardRef.current, {
       rotation: 6,
       scale: 1,
@@ -99,7 +138,7 @@ export default function FolderCard() {
     });
   };
   const onDown = () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || easterEggTriggered) return;
     gsap.to(cardRef.current, {
       scale: 1.07,
       duration: 0.15,
@@ -107,7 +146,7 @@ export default function FolderCard() {
     });
   };
   const onUp = () => {
-    if (!cardRef.current) return;
+    if (!cardRef.current || easterEggTriggered) return;
     gsap.to(cardRef.current, {
       scale: 1,
       duration: 0.4,
@@ -144,6 +183,9 @@ export default function FolderCard() {
       {STICKERS.map((s) => (
         <div
           key={s.id}
+          ref={(el) => {
+            if (el) stickerRefs.current.set(s.id, el);
+          }}
           className="absolute"
           style={{
             left: s.cx,
@@ -157,6 +199,7 @@ export default function FolderCard() {
             src={s.src}
             alt={s.alt}
             rotate={s.rotate}
+            disabled={easterEggTriggered}
           />
         </div>
       ))}
