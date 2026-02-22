@@ -1,0 +1,51 @@
+@import "tailwindcss";
+
+/* ── Custom Fonts ── */
+@font-face {
+  font-family: "Awergy";
+  src: url("/fonts/AwergyRegular-V4BPl.woff2") format("woff2"),
+    url("/fonts/AwergyRegular-V4BPl.ttf") format("truetype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Krisha";
+  src: url("/fonts/KrishaRegular-518Zx.woff2") format("woff2"),
+    url("/fonts/KrishaRegular-518Zx.otf") format("opentype");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  --background: #1828c3;
+  --foreground: #ffffff;
+  --font-awergy: "Awergy", sans-serif;
+  --font-krisha: "Krisha", sans-serif;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: auto; /* GSAP handles smooth scroll */
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-awergy);
+  overflow-x: hidden;
+}

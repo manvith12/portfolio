@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+npm-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Source
+.git/
+.gitignore
+.env*.local
+.env.example
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+.next/
+out/
+dist/
+build/
+
+# Development
+.eslintcache
