@@ -1,6 +1,11 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Explicit turbopack root to avoid Next.js inferring parent workspaces
+  // (prevents warnings when multiple lockfiles exist on the machine)
+  turbopack: {
+    root: "./",
+  },
   /* Image optimization for Vercel */
   images: {
     remotePatterns: [],

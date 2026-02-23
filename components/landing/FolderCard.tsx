@@ -2,7 +2,11 @@
 
 import { useRef, useEffect, forwardRef, useImperativeHandle } from "react";
 import Image from "next/image";
-import gsap from "gsap";
+import { animate, remove, cubicBezier } from "animejs";
+
+const spring = cubicBezier(0.34, 1.56, 0.64, 1);
+const springSnappy = cubicBezier(0.16, 1, 0.3, 1);
+const material = cubicBezier(0.4, 0, 0.2, 1);
 import AnimatedSticker from "./AnimatedSticker";
 
 /*
@@ -79,6 +83,10 @@ export interface FolderCardHandle {
   frameImageRef: React.RefObject<HTMLImageElement | null>;
   /** The wrapper around all stickers (faded out during scroll) */
   stickersRef: React.RefObject<HTMLDivElement | null>;
+  /** Set true by Hero when scroll animation is active — disables hover effects */
+  scrollActiveRef: React.MutableRefObject<boolean>;
+  /** Kill any in-flight hover tweens (called by Hero when scroll first engages) */
+  killHoverTweens: () => void;
 }
 
 const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
@@ -87,20 +95,27 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
     const frameImgRef = useRef<HTMLImageElement>(null);
     const stickersWrapperRef = useRef<HTMLDivElement>(null);
     const stickerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
+    const scrollActiveRef = useRef(false);
 
     useImperativeHandle(ref, () => ({
       containerRef: cardRef,
       frameImageRef: frameImgRef,
       stickersRef: stickersWrapperRef,
+      scrollActiveRef,
+      killHoverTweens: () => {
+        if (cardRef.current) remove(cardRef.current);
+      },
     }));
 
     useEffect(() => {
       if (!cardRef.current) return;
-      gsap.fromTo(
-        cardRef.current,
-        { y: 100, opacity: 0 },
-        { y: 0, opacity: 1, duration: 1.2, ease: "power3.out", delay: 0.6 }
-      );
+      animate(cardRef.current, {
+        translateY: { from: 100, to: 0 },
+        opacity: { from: 0, to: 1 },
+        duration: 1200,
+        ease: springSnappy,
+        delay: 600,
+      });
     }, []);
 
     // Handle Easter Egg animations
@@ -108,65 +123,70 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
       if (!easterEggTriggered) return;
 
       if (cardRef.current) {
-        gsap.to(cardRef.current, {
-          rotation: 0,
-          duration: 0.8,
-          ease: "power2.inOut",
+        remove(cardRef.current);
+        animate(cardRef.current, {
+          rotate: 0,
+          duration: 800,
+          ease: material,
         });
       }
 
       stickerRefs.current.forEach((stickerEl) => {
         if (!stickerEl) return;
-        const delay = Math.random() * 0.3;
-        const duration = 2 + Math.random() * 0.8;
+        const delay = Math.random() * 300;
+        const duration = 2000 + Math.random() * 800;
         const spreadX = (Math.random() - 0.5) * 300;
         const swingAmount = (Math.random() - 0.5) * 720;
 
-        gsap.to(stickerEl, {
-          y: window.innerHeight + 100,
-          x: spreadX,
-          rotation: swingAmount,
+        animate(stickerEl, {
+          translateY: window.innerHeight + 100,
+          translateX: spreadX,
+          rotate: swingAmount,
           opacity: 0,
           duration,
           delay,
-          ease: "power1.in",
+          ease: "inQuad",
         });
       });
     }, [easterEggTriggered]);
 
     /* ── Whole‑card hover / tap ── */
     const onEnter = () => {
-      if (!cardRef.current || easterEggTriggered) return;
-      gsap.to(cardRef.current, {
-        rotation: 3,
-        scale: 1.03,
-        duration: 0.5,
-        ease: "power2.out",
+      if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
+      remove(cardRef.current);
+      animate(cardRef.current, {
+        rotate: 3,
+        scale: 1.04,
+        duration: 350,
+        ease: spring,
       });
     };
     const onLeave = () => {
-      if (!cardRef.current || easterEggTriggered) return;
-      gsap.to(cardRef.current, {
-        rotation: 6,
+      if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
+      remove(cardRef.current);
+      animate(cardRef.current, {
+        rotate: 6,
         scale: 1,
-        duration: 0.6,
-        ease: "elastic.out(1, 0.5)",
+        duration: 500,
+        ease: spring,
       });
     };
     const onDown = () => {
-      if (!cardRef.current || easterEggTriggered) return;
-      gsap.to(cardRef.current, {
+      if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
+      remove(cardRef.current);
+      animate(cardRef.current, {
         scale: 1.07,
-        duration: 0.15,
-        ease: "power2.out",
+        duration: 120,
+        ease: material,
       });
     };
     const onUp = () => {
-      if (!cardRef.current || easterEggTriggered) return;
-      gsap.to(cardRef.current, {
+      if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
+      remove(cardRef.current);
+      animate(cardRef.current, {
         scale: 1,
-        duration: 0.4,
-        ease: "elastic.out(1, 0.4)",
+        duration: 400,
+        ease: spring,
       });
     };
 

@@ -2,7 +2,10 @@
 
 import { useRef } from "react";
 import Image from "next/image";
-import gsap from "gsap";
+import { animate, remove, cubicBezier } from "animejs";
+
+const spring = cubicBezier(0.34, 1.56, 0.64, 1);
+const material = cubicBezier(0.4, 0, 0.2, 1);
 
 interface AnimatedStickerProps {
   src: string;
@@ -21,39 +24,43 @@ export default function AnimatedSticker({
 
   const handleMouseEnter = () => {
     if (disabled || !ref.current) return;
-    gsap.to(ref.current, {
-      rotation: rotate + (Math.random() > 0.5 ? 10 : -10),
-      scale: 1.15,
-      duration: 0.4,
-      ease: "back.out(1.7)",
+    remove(ref.current);
+    animate(ref.current, {
+      rotate: rotate + (Math.random() > 0.5 ? 12 : -12),
+      scale: 1.18,
+      duration: 300,
+      ease: spring,
     });
   };
 
   const handleMouseLeave = () => {
     if (disabled || !ref.current) return;
-    gsap.to(ref.current, {
-      rotation: rotate,
+    remove(ref.current);
+    animate(ref.current, {
+      rotate: rotate,
       scale: 1,
-      duration: 0.5,
-      ease: "elastic.out(1, 0.4)",
+      duration: 500,
+      ease: spring,
     });
   };
 
   const handlePointerDown = () => {
     if (disabled || !ref.current) return;
-    gsap.to(ref.current, {
-      scale: 1.25,
-      duration: 0.15,
-      ease: "power2.out",
+    remove(ref.current);
+    animate(ref.current, {
+      scale: 1.28,
+      duration: 100,
+      ease: material,
     });
   };
 
   const handlePointerUp = () => {
     if (disabled || !ref.current) return;
-    gsap.to(ref.current, {
-      scale: 1.15,
-      duration: 0.3,
-      ease: "elastic.out(1, 0.4)",
+    remove(ref.current);
+    animate(ref.current, {
+      scale: 1.18,
+      duration: 300,
+      ease: spring,
     });
   };
 

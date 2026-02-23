@@ -10,7 +10,7 @@ gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
 /** Frame image paths for the 12-frame folder opening sequence */
 const FRAME_PATHS = [
-  "/assets/folder/folder.png",
+  "/assets/folder/folder.svg",
   "/assets/folder/folder2.png",
   "/assets/folder/folder3.png",
   "/assets/folder/folder4.png",
@@ -21,7 +21,7 @@ const FRAME_PATHS = [
   "/assets/folder/folder9.png",
   "/assets/folder/folder10.png",
   "/assets/folder/folder11.png",
-  "/assets/folder/folder12.png",
+  "/assets/folder/folder12.svg",
 ];
 
 interface HeroProps {
@@ -99,20 +99,30 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
         scrollTrigger: {
           trigger: pin,
           start: "top top",
-          end: "+=300%",
+          end: "+=250%",
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,
+          onUpdate: (self) => {
+            const f = folderRef.current;
+            if (!f) return;
+            const wasActive = f.scrollActiveRef.current;
+            f.scrollActiveRef.current = self.progress > 0.01;
+            // First moment scroll engages: kill any in-flight hover tweens so
+            // they don't fight GSAP's scale/rotation scroll animation
+            if (!wasActive && self.progress > 0.01) {
+              f.killHoverTweens();
+            }
+          },
         },
       });
 
       const frameState = { current: 0 };
 
-      /* ─── PHASE 1 (0→0.15): Zoom in + straighten + fade stickers + hide title ─── */
+      /* ─── PHASE 1 (0→0.15): Straighten + fade stickers + hide title ─── */
       tl.to(
         container,
         {
-          scale: 1.8,
           rotation: 0,
           duration: 0.15,
           ease: "power2.inOut",
@@ -120,33 +130,26 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
         0
       );
 
-      tl.to(
+      tl.fromTo(
         stickers,
-        {
-          opacity: 0,
-          duration: 0.1,
-          ease: "power2.in",
-        },
+        { opacity: 1 },
+        { opacity: 0, duration: 0.1, ease: "power2.in" },
         0.02
       );
 
-      tl.to(
+      tl.fromTo(
         title,
-        {
-          opacity: 0,
-          y: -80,
-          duration: 0.1,
-          ease: "power2.in",
-        },
+        { opacity: 1, y: 0 },
+        { opacity: 0, y: -80, duration: 0.1, ease: "power2.in" },
         0
       );
 
-      /* ─── PHASE 2 (0.15→0.55): Frame-by-frame folder opening ─── */
+      /* ─── PHASE 2 (0.15→1.0): Frame-by-frame folder opening ─── */
       tl.to(
         frameState,
         {
           current: FRAME_PATHS.length - 1,
-          duration: 0.4,
+          duration: 0.85,
           ease: "none",
           onUpdate: function () {
             const idx = Math.round(frameState.current);
@@ -156,30 +159,6 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
           },
         },
         0.15
-      );
-
-      /* ─── PHASE 3 (0.55→0.70): Pan out slightly to show opened folder ─── */
-      tl.to(
-        container,
-        {
-          scale: 1.2,
-          duration: 0.15,
-          ease: "power2.inOut",
-        },
-        0.55
-      );
-
-      /* ─── PHASE 4 (0.70→1.0): Aggressive zoom into top-left of folder ─── */
-      tl.to(
-        container,
-        {
-          scale: 12,
-          xPercent: 60,
-          yPercent: -30,
-          duration: 0.3,
-          ease: "power3.in",
-        },
-        0.70
       );
 
       tlRef.current = tl;
@@ -224,11 +203,14 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       </h1>
 
       {/* Folder card */}
-      <FolderCard
-        ref={folderRef}
-        easterEggTriggered={easterEggTriggered}
-        onClick={handleFolderClick}
-      />
+      <div style={{ transform: "translateY(-130px)" }}>
+        <FolderCard
+          ref={folderRef}
+          easterEggTriggered={easterEggTriggered}
+          onClick={handleFolderClick}
+        />
+      </div>
+
     </section>
   );
 }
