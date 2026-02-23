@@ -161,6 +161,17 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
         0.15
       );
 
+      /* ─── PHASE 3 (0.85→1.0): Scale up only the last frame ─── */
+      tl.to(
+        container,
+        {
+          scale: 2,
+          duration: 0.15,
+          ease: "power2.inOut",
+        },
+        0.85
+      );
+
       tlRef.current = tl;
     });
 

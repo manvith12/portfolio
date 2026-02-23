@@ -195,7 +195,7 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         ref={cardRef}
         className="relative cursor-pointer opacity-0"
         style={{
-          width: "min(80vw, 460px)",
+          width: "min(90vw, 550px)",
           aspectRatio: "459 / 609",
           transform: "rotate(6deg)",
         }}
