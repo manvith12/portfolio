@@ -59,7 +59,38 @@ const FRAME_PATHS = [
 const FOLDER12_INDEX = 11; // 0-based index of folder12.svg
 const FOLDER26_INDEX = 26; // 0-based index of folder26.svg (folder13-1 is an extra frame, shifts indices up)
 
-// Rolling buffer config
+// ── LRU Cache for preloaded HTMLImageElements ──
+class LRUFrameCache {
+  private cache = new Map<number, HTMLImageElement>();
+  private maxSize: number;
+  constructor(maxSize = 20) {
+    this.maxSize = maxSize;
+  }
+  get(key: number): HTMLImageElement | undefined {
+    const val = this.cache.get(key);
+    if (val !== undefined) {
+      this.cache.delete(key);
+      this.cache.set(key, val);
+    }
+    return val;
+  }
+  set(key: number, value: HTMLImageElement): void {
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxSize) {
+      const oldest = this.cache.keys().next().value!;
+      this.cache.delete(oldest);
+    }
+    this.cache.set(key, value);
+  }
+  has(key: number): boolean {
+    return this.cache.has(key);
+  }
+  clear(): void {
+    this.cache.clear();
+  }
+}
+
 const BUFFER_AHEAD = 8;
 const BUFFER_BEHIND = 3;
 
@@ -73,127 +104,12 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
   const folderRef = useRef<FolderCardHandle>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const isAutoPlaying = useRef(false);
-
-  // Frame buffer system using refs (no React re-renders)
-  const bitmapCache = useRef<Map<number, ImageBitmap>>(new Map());
-  const pendingLoads = useRef<Set<number>>(new Set());
-  const currentFrameRef = useRef(0);
-  const lastRenderedFrame = useRef(-1);
-  const rafId = useRef(0);
-  const isUnmounted = useRef(false);
-
-  /** Load a single frame as ImageBitmap (async, off main thread decoding) */
-  const loadFrame = useCallback((index: number): Promise<ImageBitmap | null> => {
-    if (bitmapCache.current.has(index) || pendingLoads.current.has(index)) {
-      return Promise.resolve(bitmapCache.current.get(index) ?? null);
-    }
-    if (index < 0 || index >= FRAME_PATHS.length) return Promise.resolve(null);
-
-    pendingLoads.current.add(index);
-
-    return fetch(FRAME_PATHS[index])
-      .then((res) => res.blob())
-      .then((blob) => createImageBitmap(blob))
-      .then((bmp) => {
-        if (!isUnmounted.current) {
-          bitmapCache.current.set(index, bmp);
-        }
-        pendingLoads.current.delete(index);
-        return bmp;
-      })
-      .catch(() => {
-        pendingLoads.current.delete(index);
-        return null;
-      });
-  }, []);
-
-  /** Fill the rolling buffer around a target frame index */
-  const fillBuffer = useCallback(
-    (targetIdx: number) => {
-      // Load frames ahead
-      const loadPromises: Promise<ImageBitmap | null>[] = [];
-      for (let i = targetIdx; i <= Math.min(targetIdx + BUFFER_AHEAD, FRAME_PATHS.length - 1); i++) {
-        if (!bitmapCache.current.has(i)) {
-          loadPromises.push(loadFrame(i));
-        }
-      }
-
-      // Evict old frames behind
-      const evictBefore = targetIdx - BUFFER_BEHIND;
-      bitmapCache.current.forEach((bmp, key) => {
-        if (key < evictBefore) {
-          bmp.close(); // Free GPU memory
-          bitmapCache.current.delete(key);
-        }
-      });
-
-      return loadPromises;
-    },
-    [loadFrame]
-  );
-
-  /** Render a frame to canvas using rAF (decoupled from React) */
-  const renderFrame = useCallback(() => {
-    const folder = folderRef.current;
-    if (!folder) return;
-
-    const canvas = folder.canvasRef.current;
-    const ctx = folder.canvasCtxRef.current;
-    if (!canvas || !ctx) return;
-
-    const targetFrame = currentFrameRef.current;
-
-    // Adaptive frame skipping: if we're behind, jump to target
-    if (targetFrame === lastRenderedFrame.current) return;
-
-    const bitmap = bitmapCache.current.get(targetFrame);
-    if (bitmap) {
-      // Resize canvas if needed (match display size at device pixel ratio)
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for perf
-      const w = Math.round(rect.width * dpr);
-      const h = Math.round(rect.height * dpr);
-
-      if (canvas.width !== w || canvas.height !== h) {
-        canvas.width = w;
-        canvas.height = h;
-      }
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Draw bitmap scaled to fit canvas (contain)
-      const bmpAspect = bitmap.width / bitmap.height;
-      const canvasAspect = w / h;
-      let dw: number, dh: number, dx: number, dy: number;
-      if (bmpAspect > canvasAspect) {
-        dw = w;
-        dh = w / bmpAspect;
-        dx = 0;
-        dy = (h - dh) / 2;
-      } else {
-        dh = h;
-        dw = h * bmpAspect;
-        dx = (w - dw) / 2;
-        dy = 0;
-      }
-
-      ctx.drawImage(bitmap, dx, dy, dw, dh);
-      lastRenderedFrame.current = targetFrame;
-    }
-
-    // Fill buffer around current position
-    fillBuffer(targetFrame);
-  }, [fillBuffer]);
-
-  /** rAF render loop — runs independently of React */
-  const startRenderLoop = useCallback(() => {
-    const loop = () => {
-      if (isUnmounted.current) return;
-      renderFrame();
-      rafId.current = requestAnimationFrame(loop);
-    };
-    rafId.current = requestAnimationFrame(loop);
-  }, [renderFrame]);
+  const frameCacheRef = useRef(new LRUFrameCache(20));
+  const loadingRef = useRef(new Set<number>());
+  const targetFrameRef = useRef(0);
+  const renderedFrameRef = useRef(-1);
+  const rafIdRef = useRef(0);
+  const isUnmountedRef = useRef(false);
 
   // Entrance animation for title
   useEffect(() => {
@@ -227,43 +143,80 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
 
   // ── Main scroll animation setup ──
   useEffect(() => {
-    isUnmounted.current = false;
-
-    // Preload first few frames eagerly, then start rolling buffer
-    const initialLoad = Promise.all(
-      Array.from({ length: Math.min(BUFFER_AHEAD, FRAME_PATHS.length) }, (_, i) =>
-        loadFrame(i)
-      )
-    );
-
-    // Render first frame once loaded
-    initialLoad.then(() => {
-      if (!isUnmounted.current) {
-        currentFrameRef.current = 0;
-        renderFrame();
-      }
-    });
-
-    // Start the rAF render loop
-    startRenderLoop();
-
     const pin = pinWrapperRef.current;
     const folder = folderRef.current;
     if (!pin || !folder) return;
 
     const container = folder.containerRef.current;
-    const canvas = folder.canvasRef.current;
+    const frameImg = folder.frameImageRef.current;
     const stickers = folder.stickersRef.current;
     const title = titleRef.current;
 
-    if (!container || !canvas || !stickers || !title) return;
+    if (!container || !frameImg || !stickers || !title) return;
+
+    const cache = frameCacheRef.current;
+    const loading = loadingRef.current;
+    isUnmountedRef.current = false;
+
+    // ── Load a single frame as a decoded HTMLImageElement ──
+    function loadFrame(idx: number) {
+      if (cache.has(idx) || loading.has(idx) || isUnmountedRef.current) return;
+      loading.add(idx);
+      const img = new Image();
+      img.src = FRAME_PATHS[idx];
+      img.onload = () => {
+        if (isUnmountedRef.current) { loading.delete(idx); return; }
+        // Use decode() for async decoding so the browser doesn't jank on first display
+        img.decode().then(() => {
+          if (isUnmountedRef.current) { loading.delete(idx); return; }
+          cache.set(idx, img);
+          loading.delete(idx);
+        }).catch(() => {
+          // decode() can fail on some browsers/formats; still cache the loaded img
+          cache.set(idx, img);
+          loading.delete(idx);
+        });
+      };
+      img.onerror = () => loading.delete(idx);
+    }
+
+    // ── Rolling buffer: preload frames around current position ──
+    function loadAround(centerIdx: number) {
+      const start = Math.max(0, centerIdx - BUFFER_BEHIND);
+      const end = Math.min(FRAME_PATHS.length - 1, centerIdx + BUFFER_AHEAD);
+      for (let i = start; i <= end; i++) loadFrame(i);
+    }
+
+    // ── rAF render loop (no React state, direct img.src swap) ──
+    function renderLoop() {
+      if (isUnmountedRef.current) return;
+      const target = targetFrameRef.current;
+      if (target !== renderedFrameRef.current) {
+        const cached = cache.get(target);
+        if (cached && frameImg) {
+          frameImg.src = cached.src;
+          renderedFrameRef.current = target;
+        }
+      }
+      rafIdRef.current = requestAnimationFrame(renderLoop);
+    }
+
+    // Preload first 3 frames, then start render loop
+    for (let i = 0; i < 3 && i < FRAME_PATHS.length; i++) loadFrame(i);
+    rafIdRef.current = requestAnimationFrame(renderLoop);
+
+    // ── Frame update helper (called from GSAP onUpdate) ──
+    function updateFrame(idx: number) {
+      targetFrameRef.current = idx;
+      loadAround(idx);
+    }
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: pin,
           start: "top top",
-          end: "+=500%",
+          end: "+=500%", // Extended to accommodate 3-second holds at both folder12 and folder26
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,
@@ -272,6 +225,8 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
             if (!f) return;
             const wasActive = f.scrollActiveRef.current;
             f.scrollActiveRef.current = self.progress > 0.01;
+            // First moment scroll engages: kill any in-flight hover tweens so
+            // they don't fight GSAP's scale/rotation scroll animation
             if (!wasActive && self.progress > 0.01) {
               f.killHoverTweens();
             }
@@ -280,14 +235,6 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       });
 
       const frameState = { current: 0 };
-
-      /** Shared frame update — just sets the target index; rAF loop handles rendering */
-      const updateFrame = () => {
-        const idx = Math.round(frameState.current);
-        if (idx !== currentFrameRef.current) {
-          currentFrameRef.current = idx;
-        }
-      };
 
       /* ─── PHASE 1 (0→0.10): Straighten + fade stickers + hide title ─── */
       tl.to(
@@ -318,43 +265,49 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       tl.to(
         frameState,
         {
-          current: FOLDER12_INDEX,
+          current: FOLDER12_INDEX, // Stop at folder12 (index 11)
           duration: 0.15,
           ease: "power1.inOut",
-          onUpdate: updateFrame,
+          onUpdate() {
+            updateFrame(Math.round(frameState.current));
+          },
         },
         0.10
       );
 
       /* ─── PHASE 2B (0.25→0.50): FORCED 3-SECOND HOLD at folder12 with pan-in scale effect ─── */
+      // Hold frame at folder12 - scale in from 1.0 to 1.8 (increased by 0.2 from 1.6)
       tl.to(
         container,
         {
           scale: 1.8,
-          duration: 0.25,
+          duration: 0.25, // 0.25 timeline duration ≈ 3 seconds with scrub: 0.8
           ease: "power2.inOut",
         },
         0.25
       );
 
-      /* ─── PHASE 2C (0.50→0.65): Resume frame advancement from folder13 to folder26 ─── */
+      /* ─── PHASE 2C (0.50→0.65): Resume frame advancement from folder13 to folder25 ─── */
       tl.to(
         frameState,
         {
-          current: FOLDER26_INDEX,
+          current: FOLDER26_INDEX, // Advance to folder26 (index 25)
           duration: 0.15,
           ease: "power1.inOut",
-          onUpdate: updateFrame,
+          onUpdate() {
+            updateFrame(Math.round(frameState.current));
+          },
         },
         0.50
       );
 
       /* ─── PHASE 2D (0.65→0.90): FORCED 3-SECOND HOLD at folder26 with pan-in scale effect ─── */
+      // Hold frame at folder26 - scale to 1.8 (same treatment as folder12)
       tl.to(
         container,
         {
           scale: 1.8,
-          duration: 0.25,
+          duration: 0.25, // 0.25 timeline duration ≈ 3 seconds with scrub: 0.8
           ease: "power2.inOut",
         },
         0.65
@@ -364,10 +317,12 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       tl.to(
         frameState,
         {
-          current: FRAME_PATHS.length - 1,
+          current: FRAME_PATHS.length - 1, // Advance to last frame (folder42)
           duration: 0.08,
           ease: "power1.inOut",
-          onUpdate: updateFrame,
+          onUpdate() {
+            updateFrame(Math.round(frameState.current));
+          },
         },
         0.90
       );
@@ -387,15 +342,13 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
     });
 
     return () => {
-      isUnmounted.current = true;
-      cancelAnimationFrame(rafId.current);
-      // Free all cached bitmaps
-      bitmapCache.current.forEach((bmp) => bmp.close());
-      bitmapCache.current.clear();
-      pendingLoads.current.clear();
+      isUnmountedRef.current = true;
+      cancelAnimationFrame(rafIdRef.current);
+      cache.clear();
+      loading.clear();
       ctx.revert();
     };
-  }, [loadFrame, fillBuffer, renderFrame, startRenderLoop]);
+  }, []);
 
   /** Click handler: Three-stage navigation - folder12 → folder26 → folder42 */
   const handleFolderClick = useCallback(() => {

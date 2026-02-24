@@ -4,6 +4,7 @@ import { useState, useCallback } from "react";
 import { Hero } from "@/components/landing";
 import { useKeyboardDetection } from "@/hooks/useKeyboardDetection";
 import { SpeedInsights } from "@vercel/speed-insights/next";
+import { Analytics } from "@vercel/analytics/next";
 
 export default function Home() {
   const [easterEggTriggered, setEasterEggTriggered] = useState(false);
@@ -23,6 +24,7 @@ export default function Home() {
       <Hero easterEggTriggered={easterEggTriggered} />
 
       <SpeedInsights />
+      <Analytics />
     </main>
   );
 }

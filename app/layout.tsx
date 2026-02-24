@@ -14,12 +14,6 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <head>
-        {/* Preload first 3 frames to eliminate initial flash */}
-        <link rel="preload" href="/assets/folder/folder.svg" as="image" />
-        <link rel="preload" href="/assets/folder/folder2.png" as="image" />
-        <link rel="preload" href="/assets/folder/folder3.png" as="image" />
-      </head>
       <body className="antialiased">{children}</body>
     </html>
   );
