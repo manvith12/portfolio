@@ -79,8 +79,10 @@ interface FolderCardProps {
 export interface FolderCardHandle {
   /** The folder container div (gets scaled/rotated by scroll animation) */
   containerRef: React.RefObject<HTMLDivElement | null>;
-  /** The native <img> used for frame-by-frame swaps */
-  frameImageRef: React.RefObject<HTMLImageElement | null>;
+  /** The <canvas> used for GPU-accelerated frame rendering */
+  canvasRef: React.RefObject<HTMLCanvasElement | null>;
+  /** Cached 2D context for the canvas */
+  canvasCtxRef: React.MutableRefObject<CanvasRenderingContext2D | null>;
   /** The wrapper around all stickers (faded out during scroll) */
   stickersRef: React.RefObject<HTMLDivElement | null>;
   /** Set true by Hero when scroll animation is active — disables hover effects */
@@ -92,14 +94,26 @@ export interface FolderCardHandle {
 const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
   function FolderCard({ easterEggTriggered = false, onClick }, ref) {
     const cardRef = useRef<HTMLDivElement>(null);
-    const frameImgRef = useRef<HTMLImageElement>(null);
+    const canvasRef = useRef<HTMLCanvasElement>(null);
+    const canvasCtxRef = useRef<CanvasRenderingContext2D | null>(null);
     const stickersWrapperRef = useRef<HTMLDivElement>(null);
     const stickerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollActiveRef = useRef(false);
 
+    // Cache the 2D context once the canvas mounts
+    useEffect(() => {
+      if (canvasRef.current && !canvasCtxRef.current) {
+        canvasCtxRef.current = canvasRef.current.getContext("2d", {
+          alpha: true,
+          desynchronized: true, // Reduces latency on supported browsers
+        });
+      }
+    }, []);
+
     useImperativeHandle(ref, () => ({
       containerRef: cardRef,
-      frameImageRef: frameImgRef,
+      canvasRef,
+      canvasCtxRef,
       stickersRef: stickersWrapperRef,
       scrollActiveRef,
       killHoverTweens: () => {
@@ -205,14 +219,13 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         onPointerUp={onUp}
         onClick={onClick}
       >
-        {/* ── Frame image for scroll animation (native img for fast src swap) ── */}
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          ref={frameImgRef}
-          src="/assets/folder/folder.png"
-          alt="Portfolio folder of S. Manvith"
-          className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
-          draggable={false}
+        {/* ── Canvas for GPU-accelerated frame rendering ── */}
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 w-full h-full pointer-events-none select-none"
+          style={{ willChange: "transform", transform: "translateZ(0)" }}
+          aria-label="Portfolio folder of S. Manvith"
+          role="img"
         />
 
         {/* ── Interactive sticker overlays ── */}

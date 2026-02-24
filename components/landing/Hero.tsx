@@ -8,7 +8,7 @@ import FolderCard, { type FolderCardHandle } from "./FolderCard";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
-/** Frame image paths for the 12-frame folder opening sequence */
+/** Frame image paths for the 42-frame folder opening sequence */
 const FRAME_PATHS = [
   "/assets/folder/folder.svg",
   "/assets/folder/folder2.png",
@@ -22,7 +22,46 @@ const FRAME_PATHS = [
   "/assets/folder/folder10.png",
   "/assets/folder/folder11.png",
   "/assets/folder/folder12.svg",
+  "/assets/folder/folder13.png",
+  "/assets/folder/folder13-1.png",
+  "/assets/folder/folder14.png",
+  "/assets/folder/folder15.png",
+  "/assets/folder/folder16.png",
+  "/assets/folder/folder17.png",
+  "/assets/folder/folder18.png",
+  "/assets/folder/folder19.png",
+  "/assets/folder/folder20.png",
+  "/assets/folder/folder21.png",
+  "/assets/folder/folder22.png",
+  "/assets/folder/folder23.png",
+  "/assets/folder/folder24.png",
+  "/assets/folder/folder25.png",
+  "/assets/folder/folder26.svg",
+  "/assets/folder/folder27.png",
+  "/assets/folder/folder28.png",
+  "/assets/folder/folder29.png",
+  "/assets/folder/folder30.png",
+  "/assets/folder/folder31.png",
+  "/assets/folder/folder32.png",
+  "/assets/folder/folder33.png",
+  "/assets/folder/folder34.png",
+  "/assets/folder/folder35.png",
+  "/assets/folder/folder36.png",
+  "/assets/folder/folder37.png",
+  "/assets/folder/folder38.png",
+  "/assets/folder/folder39.png",
+  "/assets/folder/folder40.png",
+  "/assets/folder/folder41.png",
+  "/assets/folder/folder42.png",
 ];
+
+// Landmark indices
+const FOLDER12_INDEX = 11; // 0-based index of folder12.svg
+const FOLDER26_INDEX = 26; // 0-based index of folder26.svg (folder13-1 is an extra frame, shifts indices up)
+
+// Rolling buffer config
+const BUFFER_AHEAD = 8;
+const BUFFER_BEHIND = 3;
 
 interface HeroProps {
   easterEggTriggered?: boolean;
@@ -34,7 +73,127 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
   const folderRef = useRef<FolderCardHandle>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const isAutoPlaying = useRef(false);
-  const framesRef = useRef<HTMLImageElement[]>([]);
+
+  // Frame buffer system using refs (no React re-renders)
+  const bitmapCache = useRef<Map<number, ImageBitmap>>(new Map());
+  const pendingLoads = useRef<Set<number>>(new Set());
+  const currentFrameRef = useRef(0);
+  const lastRenderedFrame = useRef(-1);
+  const rafId = useRef(0);
+  const isUnmounted = useRef(false);
+
+  /** Load a single frame as ImageBitmap (async, off main thread decoding) */
+  const loadFrame = useCallback((index: number): Promise<ImageBitmap | null> => {
+    if (bitmapCache.current.has(index) || pendingLoads.current.has(index)) {
+      return Promise.resolve(bitmapCache.current.get(index) ?? null);
+    }
+    if (index < 0 || index >= FRAME_PATHS.length) return Promise.resolve(null);
+
+    pendingLoads.current.add(index);
+
+    return fetch(FRAME_PATHS[index])
+      .then((res) => res.blob())
+      .then((blob) => createImageBitmap(blob))
+      .then((bmp) => {
+        if (!isUnmounted.current) {
+          bitmapCache.current.set(index, bmp);
+        }
+        pendingLoads.current.delete(index);
+        return bmp;
+      })
+      .catch(() => {
+        pendingLoads.current.delete(index);
+        return null;
+      });
+  }, []);
+
+  /** Fill the rolling buffer around a target frame index */
+  const fillBuffer = useCallback(
+    (targetIdx: number) => {
+      // Load frames ahead
+      const loadPromises: Promise<ImageBitmap | null>[] = [];
+      for (let i = targetIdx; i <= Math.min(targetIdx + BUFFER_AHEAD, FRAME_PATHS.length - 1); i++) {
+        if (!bitmapCache.current.has(i)) {
+          loadPromises.push(loadFrame(i));
+        }
+      }
+
+      // Evict old frames behind
+      const evictBefore = targetIdx - BUFFER_BEHIND;
+      bitmapCache.current.forEach((bmp, key) => {
+        if (key < evictBefore) {
+          bmp.close(); // Free GPU memory
+          bitmapCache.current.delete(key);
+        }
+      });
+
+      return loadPromises;
+    },
+    [loadFrame]
+  );
+
+  /** Render a frame to canvas using rAF (decoupled from React) */
+  const renderFrame = useCallback(() => {
+    const folder = folderRef.current;
+    if (!folder) return;
+
+    const canvas = folder.canvasRef.current;
+    const ctx = folder.canvasCtxRef.current;
+    if (!canvas || !ctx) return;
+
+    const targetFrame = currentFrameRef.current;
+
+    // Adaptive frame skipping: if we're behind, jump to target
+    if (targetFrame === lastRenderedFrame.current) return;
+
+    const bitmap = bitmapCache.current.get(targetFrame);
+    if (bitmap) {
+      // Resize canvas if needed (match display size at device pixel ratio)
+      const rect = canvas.getBoundingClientRect();
+      const dpr = Math.min(window.devicePixelRatio || 1, 2); // Cap at 2x for perf
+      const w = Math.round(rect.width * dpr);
+      const h = Math.round(rect.height * dpr);
+
+      if (canvas.width !== w || canvas.height !== h) {
+        canvas.width = w;
+        canvas.height = h;
+      }
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Draw bitmap scaled to fit canvas (contain)
+      const bmpAspect = bitmap.width / bitmap.height;
+      const canvasAspect = w / h;
+      let dw: number, dh: number, dx: number, dy: number;
+      if (bmpAspect > canvasAspect) {
+        dw = w;
+        dh = w / bmpAspect;
+        dx = 0;
+        dy = (h - dh) / 2;
+      } else {
+        dh = h;
+        dw = h * bmpAspect;
+        dx = (w - dw) / 2;
+        dy = 0;
+      }
+
+      ctx.drawImage(bitmap, dx, dy, dw, dh);
+      lastRenderedFrame.current = targetFrame;
+    }
+
+    // Fill buffer around current position
+    fillBuffer(targetFrame);
+  }, [fillBuffer]);
+
+  /** rAF render loop — runs independently of React */
+  const startRenderLoop = useCallback(() => {
+    const loop = () => {
+      if (isUnmounted.current) return;
+      renderFrame();
+      rafId.current = requestAnimationFrame(loop);
+    };
+    rafId.current = requestAnimationFrame(loop);
+  }, [renderFrame]);
 
   // Entrance animation for title
   useEffect(() => {
@@ -68,38 +227,43 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
 
   // ── Main scroll animation setup ──
   useEffect(() => {
-    // Preload all frames
-    Promise.all(
-      FRAME_PATHS.map(
-        (src) =>
-          new Promise<HTMLImageElement>((resolve) => {
-            const img = new window.Image();
-            img.src = src;
-            img.onload = () => resolve(img);
-            img.onerror = () => resolve(img);
-          })
+    isUnmounted.current = false;
+
+    // Preload first few frames eagerly, then start rolling buffer
+    const initialLoad = Promise.all(
+      Array.from({ length: Math.min(BUFFER_AHEAD, FRAME_PATHS.length) }, (_, i) =>
+        loadFrame(i)
       )
-    ).then((frames) => {
-      framesRef.current = frames;
+    );
+
+    // Render first frame once loaded
+    initialLoad.then(() => {
+      if (!isUnmounted.current) {
+        currentFrameRef.current = 0;
+        renderFrame();
+      }
     });
+
+    // Start the rAF render loop
+    startRenderLoop();
 
     const pin = pinWrapperRef.current;
     const folder = folderRef.current;
     if (!pin || !folder) return;
 
     const container = folder.containerRef.current;
-    const frameImg = folder.frameImageRef.current;
+    const canvas = folder.canvasRef.current;
     const stickers = folder.stickersRef.current;
     const title = titleRef.current;
 
-    if (!container || !frameImg || !stickers || !title) return;
+    if (!container || !canvas || !stickers || !title) return;
 
     const ctx = gsap.context(() => {
       const tl = gsap.timeline({
         scrollTrigger: {
           trigger: pin,
           start: "top top",
-          end: "+=250%",
+          end: "+=500%",
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,
@@ -108,8 +272,6 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
             if (!f) return;
             const wasActive = f.scrollActiveRef.current;
             f.scrollActiveRef.current = self.progress > 0.01;
-            // First moment scroll engages: kill any in-flight hover tweens so
-            // they don't fight GSAP's scale/rotation scroll animation
             if (!wasActive && self.progress > 0.01) {
               f.killHoverTweens();
             }
@@ -119,12 +281,20 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
 
       const frameState = { current: 0 };
 
-      /* ─── PHASE 1 (0→0.15): Straighten + fade stickers + hide title ─── */
+      /** Shared frame update — just sets the target index; rAF loop handles rendering */
+      const updateFrame = () => {
+        const idx = Math.round(frameState.current);
+        if (idx !== currentFrameRef.current) {
+          currentFrameRef.current = idx;
+        }
+      };
+
+      /* ─── PHASE 1 (0→0.10): Straighten + fade stickers + hide title ─── */
       tl.to(
         container,
         {
           rotation: 0,
-          duration: 0.15,
+          duration: 0.1,
           ease: "power2.inOut",
         },
         0
@@ -133,62 +303,131 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       tl.fromTo(
         stickers,
         { opacity: 1 },
-        { opacity: 0, duration: 0.1, ease: "power2.in" },
-        0.02
+        { opacity: 0, duration: 0.08, ease: "power2.in" },
+        0.01
       );
 
       tl.fromTo(
         title,
         { opacity: 1, y: 0 },
-        { opacity: 0, y: -80, duration: 0.1, ease: "power2.in" },
+        { opacity: 0, y: -80, duration: 0.08, ease: "power2.in" },
         0
       );
 
-      /* ─── PHASE 2 (0.15→1.0): Frame-by-frame folder opening ─── */
+      /* ─── PHASE 2A (0.10→0.25): Advance frames 1-11 to reach folder12 ─── */
+      tl.to(
+        frameState,
+        {
+          current: FOLDER12_INDEX,
+          duration: 0.15,
+          ease: "power1.inOut",
+          onUpdate: updateFrame,
+        },
+        0.10
+      );
+
+      /* ─── PHASE 2B (0.25→0.50): FORCED 3-SECOND HOLD at folder12 with pan-in scale effect ─── */
+      tl.to(
+        container,
+        {
+          scale: 1.8,
+          duration: 0.25,
+          ease: "power2.inOut",
+        },
+        0.25
+      );
+
+      /* ─── PHASE 2C (0.50→0.65): Resume frame advancement from folder13 to folder26 ─── */
+      tl.to(
+        frameState,
+        {
+          current: FOLDER26_INDEX,
+          duration: 0.15,
+          ease: "power1.inOut",
+          onUpdate: updateFrame,
+        },
+        0.50
+      );
+
+      /* ─── PHASE 2D (0.65→0.90): FORCED 3-SECOND HOLD at folder26 with pan-in scale effect ─── */
+      tl.to(
+        container,
+        {
+          scale: 1.8,
+          duration: 0.25,
+          ease: "power2.inOut",
+        },
+        0.65
+      );
+
+      /* ─── PHASE 2E (0.90→0.98): Advance from folder27 to folder42 ─── */
       tl.to(
         frameState,
         {
           current: FRAME_PATHS.length - 1,
-          duration: 0.85,
-          ease: "none",
-          onUpdate: function () {
-            const idx = Math.round(frameState.current);
-            if (frameImg && framesRef.current[idx]) {
-              frameImg.src = framesRef.current[idx].src;
-            }
-          },
+          duration: 0.08,
+          ease: "power1.inOut",
+          onUpdate: updateFrame,
         },
-        0.15
+        0.90
       );
 
-      /* ─── PHASE 3 (0.85→1.0): Scale up only the last frame ─── */
+      /* ─── PHASE 3 (0.98→1.0): Final transition ─── */
       tl.to(
         container,
         {
-          scale: 2,
-          duration: 0.15,
+          scale: 2.0,
+          duration: 0.02,
           ease: "power2.inOut",
         },
-        0.85
+        0.98
       );
 
       tlRef.current = tl;
     });
 
-    return () => ctx.revert();
-  }, []);
+    return () => {
+      isUnmounted.current = true;
+      cancelAnimationFrame(rafId.current);
+      // Free all cached bitmaps
+      bitmapCache.current.forEach((bmp) => bmp.close());
+      bitmapCache.current.clear();
+      pendingLoads.current.clear();
+      ctx.revert();
+    };
+  }, [loadFrame, fillBuffer, renderFrame, startRenderLoop]);
 
-  /** Click handler: auto-scroll through the animation then jump to #aboutme */
+  /** Click handler: Three-stage navigation - folder12 → folder26 → folder42 */
   const handleFolderClick = useCallback(() => {
     if (isAutoPlaying.current) return;
-    const st = tlRef.current?.scrollTrigger;
+    const tl = tlRef.current;
+    const st = tl?.scrollTrigger;
     if (!st) return;
 
     isAutoPlaying.current = true;
 
+    // Check current progress in animation
+    const currentProgress = st.progress ?? 0;
+
+    // Determine target scroll position based on current progress
+    let targetProgress: number;
+    if (currentProgress < 0.25) {
+      // User clicked at the beginning → scroll to end of folder12 hold (0.50)
+      targetProgress = 0.50;
+    } else if (currentProgress < 0.65) {
+      // User clicked at folder12 → scroll to end of folder26 hold (0.90)
+      targetProgress = 0.90;
+    } else {
+      // User clicked at folder26 or beyond → scroll to end (folder42)
+      targetProgress = 1.0;
+    }
+
+    // Calculate the actual scroll pixel value based on target progress
+    const targetScrollY = st.start + (st.end - st.start) * targetProgress;
+
     gsap.to(window, {
-      scrollTo: { y: st.end, autoKill: false },
-      duration: 3.5,
+      scrollTo: { y: targetScrollY, autoKill: false },
+      duration: currentProgress < 0.25 ? 2.0 : 3.0,
       ease: "power2.inOut",
       onComplete: () => {
         isAutoPlaying.current = false;
