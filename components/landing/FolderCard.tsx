@@ -218,7 +218,7 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         <img
           ref={frameImgRef}
           src="/assets/folder/folder.svg"
-          alt="Portfolio folder of S. Manvith"
+          alt="Portfolio folder of Sanisetty Manvith"
           className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
           style={{ willChange: "transform", transform: "translateZ(0)" }}
           draggable={false}

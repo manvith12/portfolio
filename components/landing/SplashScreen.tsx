@@ -88,7 +88,7 @@ export default function SplashScreen({ ready, onComplete }: SplashScreenProps) {
             strokeDashoffset="276.46"
           />
         </svg>
-        <p className="splash-name">S. Manvith</p>
+        <p className="splash-name">Sanisetty Manvith</p>
       </div>
     </div>
   );

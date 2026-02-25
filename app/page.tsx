@@ -32,6 +32,11 @@ export default function Home() {
         easterEggTriggered ? "bg-black" : "bg-[#1828c3]"
       }`}
     >
+      {/* SEO: visually hidden H1 with target keywords */}
+      <h1 className="sr-only">
+        Sanisetty Manvith &mdash; Developer Portfolio | IIIT Kottayam
+      </h1>
+
       {!splashDone && (
         <SplashScreen ready={framesReady} onComplete={handleSplashComplete} />
       )}

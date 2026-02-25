@@ -102,7 +102,7 @@ interface HeroProps {
 }
 
 export default function Hero({ easterEggTriggered = false, onReady }: HeroProps) {
-  const titleRef = useRef<HTMLHeadingElement>(null);
+  const titleRef = useRef<HTMLParagraphElement>(null);
   const pinWrapperRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FolderCardHandle>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
@@ -444,9 +444,10 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       ref={pinWrapperRef}
       className="relative flex min-h-screen w-full flex-col items-center justify-center gap-4 overflow-hidden px-4 py-16"
     >
-      {/* Title */}
-      <h1
+      {/* Decorative title (H1 is in page.tsx for SEO) */}
+      <p
         ref={titleRef}
+        aria-hidden="true"
         className="select-none text-center leading-none text-white opacity-0"
         style={{
           fontFamily: "var(--font-awergy)",
@@ -454,7 +455,7 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
         }}
       >
         Portfolio
-      </h1>
+      </p>
 
       {/* Folder card */}
       <div style={{ transform: `translateY(${responsive.folderOffsetY}px)` }}>
