@@ -96,9 +96,11 @@ const BUFFER_BEHIND = 3;
 
 interface HeroProps {
   easterEggTriggered?: boolean;
+  /** Called once the first batch of frames is loaded (splash can dismiss) */
+  onReady?: () => void;
 }
 
-export default function Hero({ easterEggTriggered = false }: HeroProps) {
+export default function Hero({ easterEggTriggered = false, onReady }: HeroProps) {
   const titleRef = useRef<HTMLHeadingElement>(null);
   const pinWrapperRef = useRef<HTMLDivElement>(null);
   const folderRef = useRef<FolderCardHandle>(null);
@@ -201,8 +203,38 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
       rafIdRef.current = requestAnimationFrame(renderLoop);
     }
 
-    // Preload first 3 frames, then start render loop
-    for (let i = 0; i < 3 && i < FRAME_PATHS.length; i++) loadFrame(i);
+    // Preload first 12 frames (through folder12 landmark), then start render loop
+    let loadedCount = 0;
+    const PRELOAD_TARGET = Math.min(FOLDER12_INDEX + 1, FRAME_PATHS.length);
+    const onReadyRef = onReady; // capture for closure
+
+    function checkReady() {
+      loadedCount++;
+      if (loadedCount >= PRELOAD_TARGET && onReadyRef) {
+        onReadyRef();
+      }
+    }
+
+    for (let i = 0; i < PRELOAD_TARGET; i++) {
+      if (cache.has(i)) { checkReady(); continue; }
+      loading.add(i);
+      const img = new Image();
+      img.src = FRAME_PATHS[i];
+      img.onload = () => {
+        if (isUnmountedRef.current) { loading.delete(i); return; }
+        img.decode().then(() => {
+          cache.set(i, img);
+          loading.delete(i);
+          checkReady();
+        }).catch(() => {
+          cache.set(i, img);
+          loading.delete(i);
+          checkReady();
+        });
+      };
+      img.onerror = () => { loading.delete(i); checkReady(); };
+    }
+
     rafIdRef.current = requestAnimationFrame(renderLoop);
 
     // ── Frame update helper (called from GSAP onUpdate) ──
@@ -350,8 +382,8 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
     };
   }, []);
 
-  /** Click handler: Three-stage navigation - folder12 → folder26 → folder42 */
-  const handleFolderClick = useCallback(() => {
+  /** Click handler: left half scrolls back to last important frame (from folder12+), right half scrolls forward */
+  const handleFolderClick = useCallback((isLeft: boolean) => {
     if (isAutoPlaying.current) return;
     const tl = tlRef.current;
     const st = tl?.scrollTrigger;
@@ -359,28 +391,38 @@ export default function Hero({ easterEggTriggered = false }: HeroProps) {
 
     isAutoPlaying.current = true;
 
-    // Check current progress in animation
     const currentProgress = st.progress ?? 0;
 
-    // Determine target scroll position based on current progress
     let targetProgress: number;
-    if (currentProgress < 0.25) {
-      // User clicked at the beginning → scroll to end of folder12 hold (0.50)
-      targetProgress = 0.50;
-    } else if (currentProgress < 0.65) {
-      // User clicked at folder12 → scroll to end of folder26 hold (0.90)
-      targetProgress = 0.90;
+
+    if (isLeft && currentProgress >= 0.25) {
+      // ── Left half: scroll BACK to last important frame (only from folder12 onwards) ──
+      // Use 0.92 (not 0.90) so floating-point overshoot after a right-click
+      // landing at ~0.9000…01 still counts as "at folder26", not "past it".
+      if (currentProgress > 0.92) {
+        targetProgress = 0.90; // back to folder26
+      } else if (currentProgress > 0.50) {
+        targetProgress = 0.50; // back to folder12
+      } else {
+        targetProgress = 0; // back to the very beginning
+      }
     } else {
-      // User clicked at folder26 or beyond → scroll to end (folder42)
-      targetProgress = 1.0;
+      // ── Right half (or any click before folder12): scroll FORWARD to next important frame ──
+      if (currentProgress < 0.25) {
+        targetProgress = 0.50; // forward to folder12 hold
+      } else if (currentProgress < 0.65) {
+        targetProgress = 0.90; // forward to folder26 hold
+      } else {
+        targetProgress = 1.0; // forward to end
+      }
     }
 
-    // Calculate the actual scroll pixel value based on target progress
     const targetScrollY = st.start + (st.end - st.start) * targetProgress;
+    const duration = Math.abs(targetProgress - currentProgress) < 0.4 ? 1.5 : 2.5;
 
     gsap.to(window, {
       scrollTo: { y: targetScrollY, autoKill: false },
-      duration: currentProgress < 0.25 ? 2.0 : 3.0,
+      duration,
       ease: "power2.inOut",
       onComplete: () => {
         isAutoPlaying.current = false;

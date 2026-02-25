@@ -73,7 +73,8 @@ const STICKERS = [
 
 interface FolderCardProps {
   easterEggTriggered?: boolean;
-  onClick?: () => void;
+  /** Called with true when left half is clicked, false for right half */
+  onClick?: (isLeft: boolean) => void;
 }
 
 export interface FolderCardHandle {
@@ -203,7 +204,12 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         onMouseLeave={onLeave}
         onPointerDown={onDown}
         onPointerUp={onUp}
-        onClick={onClick}
+        onClick={(e) => {
+          if (!onClick) return;
+          const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+          const isLeft = e.clientX < rect.left + rect.width / 2;
+          onClick(isLeft);
+        }}
       >
         {/* ── Frame image for scroll animation (native img for fast src swap) ── */}
         {/* eslint-disable-next-line @next/next/no-img-element */}

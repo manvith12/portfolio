@@ -49,3 +49,114 @@ body {
   font-family: var(--font-awergy);
   overflow-x: hidden;
 }
+
+/* ═══════════════════════════════════════════
+   Splash Screen
+   ═══════════════════════════════════════════ */
+
+.splash-container {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--background);
+  transition: opacity 0.9s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.splash-exit {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* ── Floating particles ── */
+
+.splash-particles {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+
+.splash-dot {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: var(--size);
+  height: var(--size);
+  border-radius: 50%;
+  background: hsla(var(--hue), 80%, 78%, 0.55);
+  box-shadow: 0 0 6px 2px hsla(var(--hue), 80%, 72%, 0.2);
+  animation:
+    splash-drift var(--dur) var(--delay) ease-in-out infinite alternate,
+    splash-pulse var(--dur) var(--delay) ease-in-out infinite alternate;
+  will-change: transform, opacity;
+}
+
+@keyframes splash-drift {
+  0% {
+    transform: translate(-50%, -50%) translate(0, 0) scale(0.6);
+  }
+  100% {
+    transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) scale(1);
+  }
+}
+
+@keyframes splash-pulse {
+  0%   { opacity: 0.25; }
+  50%  { opacity: 0.7; }
+  100% { opacity: 0.3; }
+}
+
+/* ── Center ring + name ── */
+
+.splash-center {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  z-index: 1;
+}
+
+.splash-ring {
+  animation: splash-spin 3s linear infinite;
+}
+
+@keyframes splash-spin {
+  to { transform: rotate(360deg); }
+}
+
+.splash-ring-fill {
+  transition: stroke-dashoffset 2.5s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: splash-ring-load 2.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes splash-ring-load {
+  to { stroke-dashoffset: 40; }
+}
+
+.splash-ring-done {
+  stroke-dashoffset: 0 !important;
+  transition: stroke-dashoffset 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.splash-name {
+  font-family: var(--font-krisha);
+  font-size: clamp(0.9rem, 2vw, 1.2rem);
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  animation: splash-name-in 1.2s 0.3s ease-out both;
+}
+
+@keyframes splash-name-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
