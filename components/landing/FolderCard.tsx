@@ -217,11 +217,12 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           ref={frameImgRef}
-          src="/assets/folder/folder.svg"
+          src="/assets/folder/folder.png"
           alt="Portfolio folder of Sanisetty Manvith"
           className="absolute inset-0 w-full h-full object-contain pointer-events-none select-none"
           style={{ willChange: "transform", transform: "translateZ(0)" }}
           draggable={false}
+          fetchPriority="high"
         />
 
         {/* ── Interactive sticker overlays ── */}

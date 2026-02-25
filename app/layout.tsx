@@ -46,6 +46,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        {/* Preload LCP image so it starts downloading before JS hydrates */}
+        <link
+          rel="preload"
+          href="/assets/folder/folder.png"
+          as="image"
+          type="image/png"
+          fetchPriority="high"
+        />
+        {/* Preload critical display font to avoid FOIT */}
+        <link
+          rel="preload"
+          href="/fonts/AwergyRegular-V4BPl.woff2"
+          as="font"
+          type="font/woff2"
+          crossOrigin="anonymous"
+        />
+        {/* DNS prefetch for deferred analytics */}
+        <link rel="dns-prefetch" href="https://va.vercel-scripts.com" />
+        <link rel="dns-prefetch" href="https://vitals.vercel-insights.com" />
         <PersonJsonLd />
         <WebSiteJsonLd />
       </head>

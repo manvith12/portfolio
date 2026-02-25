@@ -1,11 +1,17 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, lazy, Suspense } from "react";
 import { Hero } from "@/components/landing";
 import SplashScreen from "@/components/landing/SplashScreen";
 import { useKeyboardDetection } from "@/hooks/useKeyboardDetection";
-import { SpeedInsights } from "@vercel/speed-insights/next";
-import { Analytics } from "@vercel/analytics/next";
+
+// Defer non-critical analytics until after hydration
+const SpeedInsights = lazy(() =>
+  import("@vercel/speed-insights/next").then((m) => ({ default: m.SpeedInsights }))
+);
+const Analytics = lazy(() =>
+  import("@vercel/analytics/next").then((m) => ({ default: m.Analytics }))
+);
 
 export default function Home() {
   const [easterEggTriggered, setEasterEggTriggered] = useState(false);
@@ -46,8 +52,10 @@ export default function Home() {
         onReady={handleFramesReady}
       />
 
-      <SpeedInsights />
-      <Analytics />
+      <Suspense fallback={null}>
+        <SpeedInsights />
+        <Analytics />
+      </Suspense>
     </main>
   );
 }

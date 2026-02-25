@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
   /* Compress static output */
   compress: true,
 
+  /* Tree-shake barrel exports for smaller bundles */
+  experimental: {
+    optimizePackageImports: ["animejs", "gsap"],
+  },
+
   /* Caching + security headers */
   headers: async () => [
     {
