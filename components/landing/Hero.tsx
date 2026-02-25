@@ -5,6 +5,7 @@ import gsap from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ScrollToPlugin } from "gsap/ScrollToPlugin";
 import FolderCard, { type FolderCardHandle } from "./FolderCard";
+import { useResponsiveScale } from "@/hooks/useResponsiveScale";
 
 gsap.registerPlugin(ScrollTrigger, ScrollToPlugin);
 
@@ -106,6 +107,9 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
   const folderRef = useRef<FolderCardHandle>(null);
   const tlRef = useRef<gsap.core.Timeline | null>(null);
   const isAutoPlaying = useRef(false);
+  const responsive = useResponsiveScale();
+  const responsiveRef = useRef(responsive);
+  responsiveRef.current = responsive;
   const frameCacheRef = useRef(new LRUFrameCache(20));
   const loadingRef = useRef(new Set<number>());
   const targetFrameRef = useRef(0);
@@ -251,7 +255,7 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
         scrollTrigger: {
           trigger: pin,
           start: "top top",
-          end: "+=500%", // Extended to accommodate 3-second holds at both folder12 and folder26
+          end: responsiveRef.current.scrollEnd, // Shorter on mobile for less scrolling
           pin: true,
           scrub: 0.8,
           anticipatePin: 1,
@@ -292,7 +296,7 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       tl.fromTo(
         title,
         { opacity: 1, y: 0 },
-        { opacity: 0, y: -80, duration: 0.08, ease: "power2.in" },
+        { opacity: 0, y: responsiveRef.current.titleY, duration: 0.08, ease: "power2.in" },
         0
       );
 
@@ -311,12 +315,11 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       );
 
       /* ─── PHASE 2B (0.25→0.50): FORCED 3-SECOND HOLD at folder12 with pan-in scale effect ─── */
-      // Hold frame at folder12 - scale in from 1.0 to 1.8 (increased by 0.2 from 1.6)
       tl.to(
         container,
         {
-          scale: 1.8,
-          duration: 0.25, // 0.25 timeline duration ≈ 3 seconds with scrub: 0.8
+          scale: responsiveRef.current.holdScale,
+          duration: 0.25,
           ease: "power2.inOut",
         },
         0.25
@@ -340,12 +343,11 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       );
 
       /* ─── PHASE 2D (0.65→0.90): FORCED 3-SECOND HOLD at folder26 with pan-in scale effect ─── */
-      // Hold frame at folder26 - scale to 1.8 (same treatment as folder12)
       tl.to(
         container,
         {
-          scale: 1.8,
-          duration: 0.25, // 0.25 timeline duration ≈ 3 seconds with scrub: 0.8
+          scale: responsiveRef.current.holdScale,
+          duration: 0.25,
           ease: "power2.inOut",
         },
         0.65
@@ -369,7 +371,7 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       tl.to(
         container,
         {
-          scale: 2.0,
+          scale: responsiveRef.current.finalScale,
           duration: 0.02,
           ease: "power2.inOut",
         },
@@ -455,7 +457,7 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       </h1>
 
       {/* Folder card */}
-      <div style={{ transform: "translateY(-130px)" }}>
+      <div style={{ transform: `translateY(${responsive.folderOffsetY}px)` }}>
         <FolderCard
           ref={folderRef}
           easterEggTriggered={easterEggTriggered}

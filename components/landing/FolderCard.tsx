@@ -8,6 +8,7 @@ const spring = cubicBezier(0.34, 1.56, 0.64, 1);
 const springSnappy = cubicBezier(0.16, 1, 0.3, 1);
 const material = cubicBezier(0.4, 0, 0.2, 1);
 import AnimatedSticker from "./AnimatedSticker";
+import { useResponsiveScale } from "@/hooks/useResponsiveScale";
 
 /*
  * Sticker positions calculated from Figma node 15:874 (459×609 group).
@@ -97,6 +98,7 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
     const stickersWrapperRef = useRef<HTMLDivElement>(null);
     const stickerRefs = useRef<Map<string, HTMLDivElement>>(new Map());
     const scrollActiveRef = useRef(false);
+    const { isMobile } = useResponsiveScale();
 
     useImperativeHandle(ref, () => ({
       containerRef: cardRef,
@@ -156,8 +158,8 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
       if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
       remove(cardRef.current);
       animate(cardRef.current, {
-        rotate: 3,
-        scale: 1.04,
+        rotate: isMobile ? 2 : 3,
+        scale: isMobile ? 1.02 : 1.04,
         duration: 350,
         ease: spring,
       });
@@ -176,7 +178,7 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
       if (!cardRef.current || easterEggTriggered || scrollActiveRef.current) return;
       remove(cardRef.current);
       animate(cardRef.current, {
-        scale: 1.07,
+        scale: isMobile ? 1.04 : 1.07,
         duration: 120,
         ease: material,
       });
@@ -196,7 +198,7 @@ const FolderCard = forwardRef<FolderCardHandle, FolderCardProps>(
         ref={cardRef}
         className="relative cursor-pointer opacity-0"
         style={{
-          width: "min(90vw, 550px)",
+          width: isMobile ? "min(85vw, 380px)" : "min(90vw, 550px)",
           aspectRatio: "459 / 609",
           transform: "rotate(6deg)",
         }}
