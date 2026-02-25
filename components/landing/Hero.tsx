@@ -52,7 +52,7 @@ const FRAME_PATHS = [
   "/assets/folder/folder39.png",
   "/assets/folder/folder40.png",
   "/assets/folder/folder41.png",
-  "/assets/folder/folder42.png",
+  "/assets/folder/folder42.svg",
 ];
 
 // Landmark indices
@@ -237,6 +237,9 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
 
     rafIdRef.current = requestAnimationFrame(renderLoop);
 
+    // Eagerly preload folder26.svg (SVG landmark) so it's decoded before the hold phase
+    loadFrame(FOLDER26_INDEX);
+
     // ── Frame update helper (called from GSAP onUpdate) ──
     function updateFrame(idx: number) {
       targetFrameRef.current = idx;
@@ -319,15 +322,18 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
         0.25
       );
 
-      /* ─── PHASE 2C (0.50→0.65): Resume frame advancement from folder13 to folder25 ─── */
+      /* ─── PHASE 2C (0.50→0.65): Resume frame advancement from folder13 to folder26 ─── */
       tl.to(
         frameState,
         {
-          current: FOLDER26_INDEX, // Advance to folder26 (index 25)
+          current: FOLDER26_INDEX, // Advance to folder26 (index 26)
           duration: 0.15,
           ease: "power1.inOut",
           onUpdate() {
             updateFrame(Math.round(frameState.current));
+          },
+          onComplete() {
+            updateFrame(FOLDER26_INDEX);
           },
         },
         0.50
@@ -380,6 +386,8 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
       loading.clear();
       ctx.revert();
     };
+  // onReady is captured once at mount via onReadyRef — intentionally run once
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   /** Click handler: left half scrolls back to last important frame (from folder12+), right half scrolls forward */
@@ -396,13 +404,12 @@ export default function Hero({ easterEggTriggered = false, onReady }: HeroProps)
     let targetProgress: number;
 
     if (isLeft && currentProgress >= 0.25) {
-      // ── Left half: scroll BACK to last important frame (only from folder12 onwards) ──
-      // Use 0.92 (not 0.90) so floating-point overshoot after a right-click
-      // landing at ~0.9000…01 still counts as "at folder26", not "past it".
+      // ── Left half: scroll BACK to the start of the previous hold phase ──
       if (currentProgress > 0.92) {
-        targetProgress = 0.90; // back to folder26
-      } else if (currentProgress > 0.50) {
-        targetProgress = 0.50; // back to folder12
+        targetProgress = 0.65; // back to folder26 hold start
+      } else if (currentProgress >= 0.50) {
+        // >= (not >) so landing exactly at 0.50 via right-click still goes back
+        targetProgress = 0.25; // back to folder12 hold start
       } else {
         targetProgress = 0; // back to the very beginning
       }
