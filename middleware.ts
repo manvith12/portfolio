@@ -52,9 +52,9 @@ const ALLOWED_HOSTS = [
   "localhost",
   "127.0.0.1",
   // Add your production domain(s) here:
-  "manvith.me",
-  "www.manvith.me",
-  "portfolio-manvith12.vercel.app",
+  "manvith.tech",
+  "www.manvith.tech",
+  "sanisettymanvith.vercel.app",
 ];
 
 function isHotlink(req: NextRequest): boolean {
