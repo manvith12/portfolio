@@ -36,7 +36,7 @@ const FRAME_PATHS = [
   "/assets/folder/folder22.png",
   "/assets/folder/folder23.png",
   "/assets/folder/folder24.png",
-  "/assets/folder/folder25.png",
+  "/assets/folder/folder26.svg",
   "/assets/folder/folder26.svg",
   "/assets/folder/folder27.png",
   "/assets/folder/folder28.png",
